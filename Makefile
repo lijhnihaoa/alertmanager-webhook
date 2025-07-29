@@ -1,5 +1,5 @@
 # docker image
-
+GIT_COMMIT := $(shell git rev-parse --short HEAD)
 
 
 # build binary
@@ -12,7 +12,7 @@ adapter:
 .PHONY: image
 image: adapter
 	@echo === running docker build
-	@docker build --no-cache -t alertmanager-hook-adapter:v2 -f deploy/image/Dockerfile .
+	@docker build --no-cache -t alertmanager-hook-adapter:${GIT_COMMIT} -f deploy/image/Dockerfile .
 
 .PHONY: clean
 clean:
