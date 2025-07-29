@@ -11,7 +11,7 @@ import (
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
-	var payload common.AlertmanagerPayload
+	var payload common.WebhookMessage
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
@@ -23,7 +23,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		status := alert.Status
 		summary := alert.Annotations["summary"]
 		desc := alert.Annotations["description"]
-		text += fmt.Sprintf("🚨 *%s*\n状态: %s\n摘要: %s\n详情: %s\n\n", alertName, status, summary, desc)
+		text += fmt.Sprintf("🚨 *%s*\n状态: %s\n摘要: %s\n详情: %s\n故障集群:%s\n\n", alertName, status, summary, desc, alert.GeneratorURL)
 	}
 
 	msg := NewFeishuMessage(text)
