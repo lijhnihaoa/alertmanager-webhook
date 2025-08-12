@@ -1,0 +1,76 @@
+run:
+  timeout: 5m
+  tests: true
+linters:
+  disable:
+    - depguard
+    - mnd
+    - gochecknoinits
+    - gochecknoglobals
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - gosimple
+    - unused
+    - ineffassign
+    - typecheck
+    - gofmt
+    - goimports
+    - misspell
+    - revive
+    - gocritic
+    - gosec
+    - dupl
+    - gocyclo
+    - nakedret
+    - unparam
+    - whitespace
+    - prealloc
+    - stylecheck
+    - unconvert
+    - asciicheck
+    - forbidigo
+    - goconst
+    - gocognit
+    - err113
+    - goheader
+    - nolintlint
+    - rowserrcheck
+    - testpackage
+    - wastedassign
+    - wrapcheck
+    - dogsled
+    - exhaustive
+    - forbidigo
+    - gocognit
+    - gocritic
+    - godot
+    - godox
+    - gofumpt
+    - goprintffuncname
+    - gosec
+    - importas
+    - lll
+    - makezero
+    - nestif
+    - noctx
+    - predeclared
+    - promlinter
+    - rowserrcheck
+    - sqlclosecheck
+    - testpackage
+    - thelper
+    - tparallel
+    - unconvert
+    - wastedassign
+    - whitespace
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    - path: _test\.go
+      text: "Error return value is not checked"
+      linters:
+        - errcheck

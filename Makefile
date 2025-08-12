@@ -18,3 +18,11 @@ image: adapter
 clean:
 	rm -f ./alertmanager-hook-adapter
 	go clean -testcache
+
+.PHONY: lint
+lint:
+	golangci-lint run --timeout=5m
+
+.PHONY: test
+test:
+	go test ./... -v
