@@ -10,6 +10,15 @@ data:
   FEISHU_WEBHOOK_ops: "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
   FEISHU_WEBHOOK_dev: "https://open.feishu.cn/open-apis/bot/v2/hook/yyy"
   FEISHU_WEBHOOK_default: "https://open.feishu.cn/open-apis/bot/v2/hook/zzz"
+
+  # Loki 配置（可选）
+  # 如果配置了 LOKI_URL，则会自动从 Loki 查询触发告警的实际日志内容
+  LOKI_URL: "http://loki:3100"              # Loki 服务地址
+  # LOKI_USERNAME: ""                        # Loki Basic Auth 用户名（可选）
+  # LOKI_PASSWORD: ""                        # Loki Basic Auth 密码（可选）
+  LOKI_LOG_LIMIT: "10"                      # 返回的最大日志条数（默认 10）
+  LOKI_QUERY_RANGE: "5"                     # 查询时间范围，单位分钟（默认 5）
+  LOKI_QUERY_TIMEOUT: "5s"                  # 查询超时时间（默认 5s）
 ---
 apiVersion: apps/v1
 kind: Deployment
