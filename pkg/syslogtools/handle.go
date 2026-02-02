@@ -127,11 +127,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			builder.WriteString(fmt.Sprintf("Trigger Logs:\n%s\n", triggerLogs))
 		}
 
-		// 如果有 GeneratorURL，则显示
-		if alert.GeneratorURL != "" {
-			builder.WriteString(fmt.Sprintf("Generator: %s\n", alert.GeneratorURL))
-		}
-
 		text := builder.String()
 
 		// 发送到所有目标

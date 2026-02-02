@@ -128,11 +128,6 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			builder.WriteString(fmt.Sprintf("触发日志:\n%s\n", triggerLogs))
 		}
 
-		// 如果有 GeneratorURL，则显示
-		if alert.GeneratorURL != "" {
-			builder.WriteString(fmt.Sprintf("生成器: %s\n", alert.GeneratorURL))
-		}
-
 		text := builder.String()
 		msg := NewMessage(text)
 
