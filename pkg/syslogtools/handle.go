@@ -31,13 +31,46 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 使用 strings.Builder 提高性能
-	var builder strings.Builder
+	// 处理每个告警 - 单独发送到 syslog，避免消息过大
+	targetParam := r.URL.Query().Get("target")
+	var targetAddrs map[string]string
+
+	if targetParam != "" {
+		// 解析指定的目标
+		targetAddrs = make(map[string]string)
+		targets := strings.Split(targetParam, ",")
+		for _, t := range targets {
+			t = strings.TrimSpace(strings.ToLower(t))
+			if addr, exists := common.SyslogWebhook[t]; exists {
+				targetAddrs[t] = addr
+			} else {
+				log.Printf("⚠️ Target '%s' not found in configuration", t)
+			}
+		}
+	} else {
+		// 广播到所有配置的 syslog
+		targetAddrs = common.SyslogWebhook
+	}
+
+	// 如果没有有效的目标，直接返回
+	if len(targetAddrs) == 0 {
+		log.Println("⚠️ No valid syslog targets configured")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("ok")); err != nil {
+			log.Printf("❌ Failed to write response: %v", err)
+		}
+		return
+	}
+
+	// 逐个处理告警
 	for _, alert := range payload.Alerts {
+		// 为每个告警构建消息
+		var builder strings.Builder
+
 		// 获取字段值，提供默认值
 		alertName := alert.Labels["alertname"]
 		if alertName == "" {
-			alertName = "未知告警"
+			alertName = "Unknown Alert"
 		}
 
 		status := alert.Status
@@ -47,12 +80,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 
 		summary := alert.Annotations["summary"]
 		if summary == "" {
-			summary = "无摘要信息"
+			summary = "No summary"
 		}
 
 		desc := alert.Annotations["description"]
 		if desc == "" {
-			desc = "无详细描述"
+			desc = "No description"
 		}
 
 		triggerLogs := alert.Annotations["trigger_logs"]
@@ -70,7 +103,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 					log.Printf("⚠️ Failed to query Loki for alert %s: %v", alertName, err)
 					// 查询失败时保留原有的 trigger_logs 或添加错误提示
 					if triggerLogs == "" {
-						triggerLogs = fmt.Sprintf("（Loki 日志查询失败: %v）", err)
+						triggerLogs = fmt.Sprintf("(Loki query failed: %v)", err)
 					}
 				} else if len(logs) > 0 {
 					// 查询成功，格式化日志内容
@@ -80,47 +113,33 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				} else {
 					// 查询成功但没有日志
 					if triggerLogs == "" {
-						triggerLogs = "（查询时间范围内无匹配日志）"
+						triggerLogs = "(No matching logs in query range)"
 					}
 				}
 			}
 		}
 
-		builder.WriteString(fmt.Sprintf("🚨 *%s*\n状态: %s\n摘要: %s\n详情: %s\n",
+		builder.WriteString(fmt.Sprintf("Alert: %s\nStatus: %s\nSummary: %s\nDescription: %s\n",
 			alertName, status, summary, desc))
 
 		// 如果有触发日志信息，则添加显示
 		if triggerLogs != "" {
-			builder.WriteString(fmt.Sprintf("触发日志:\n%s\n", triggerLogs))
+			builder.WriteString(fmt.Sprintf("Trigger Logs:\n%s\n", triggerLogs))
 		}
 
-		builder.WriteString("\n")
-	}
-
-	text := builder.String()
-	targetParam := r.URL.Query().Get("target")
-	if targetParam != "" {
-		// 指定目标发送
-		targets := strings.Split(targetParam, ",")
-		for _, t := range targets {
-			t = strings.TrimSpace(strings.ToLower(t))
-
-			// 检查 target 是否存在
-			syslogAddr, exists := common.SyslogWebhook[t]
-			if !exists {
-				log.Printf("⚠️ Target '%s' not found in configuration", t)
-				continue
-			}
-
-			if err := sendToSyslogServer(syslogAddr, text); err != nil {
-				log.Printf("❌ Failed to send to %s: %v", t, err)
-			}
+		// 如果有 GeneratorURL，则显示
+		if alert.GeneratorURL != "" {
+			builder.WriteString(fmt.Sprintf("Generator: %s\n", alert.GeneratorURL))
 		}
-	} else {
-		// 默认广播全部
-		for name, syslogAddr := range common.SyslogWebhook {
+
+		text := builder.String()
+
+		// 发送到所有目标
+		for name, syslogAddr := range targetAddrs {
 			if err := sendToSyslogServer(syslogAddr, text); err != nil {
-				log.Printf("❌ Failed to send to %s: %v", name, err)
+				log.Printf("❌ Failed to send alert %s to %s: %v", alertName, name, err)
+			} else {
+				log.Printf("✅ Sent alert %s to syslog %s", alertName, name)
 			}
 		}
 	}

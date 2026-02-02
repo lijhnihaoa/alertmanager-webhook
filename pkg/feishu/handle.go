@@ -32,9 +32,42 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 使用 strings.Builder 提高性能
-	var builder strings.Builder
+	// 处理每个告警 - 单独发送到飞书，避免消息合并
+	targetParam := r.URL.Query().Get("target")
+	var targetWebhooks map[string]string
+
+	if targetParam != "" {
+		// 解析指定的目标
+		targetWebhooks = make(map[string]string)
+		targets := strings.Split(targetParam, ",")
+		for _, t := range targets {
+			t = strings.TrimSpace(strings.ToLower(t))
+			if url, exists := common.FeishuWebhook[t]; exists {
+				targetWebhooks[t] = url
+			} else {
+				log.Printf("⚠️ Target '%s' not found in configuration", t)
+			}
+		}
+	} else {
+		// 广播到所有配置的飞书
+		targetWebhooks = common.FeishuWebhook
+	}
+
+	// 如果没有有效的目标，直接返回
+	if len(targetWebhooks) == 0 {
+		log.Println("⚠️ No valid feishu targets configured")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("ok")); err != nil {
+			log.Printf("❌ Failed to write response: %v", err)
+		}
+		return
+	}
+
+	// 逐个处理告警
 	for _, alert := range payload.Alerts {
+		// 为每个告警构建消息
+		var builder strings.Builder
+
 		// 获取字段值，提供默认值
 		alertName := alert.Labels["alertname"]
 		if alertName == "" {
@@ -95,33 +128,20 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			builder.WriteString(fmt.Sprintf("触发日志:\n%s\n", triggerLogs))
 		}
 
-		builder.WriteString("\n")
-	}
-
-	msg := NewMessage(builder.String())
-	targetParam := r.URL.Query().Get("target")
-	if targetParam != "" {
-		// 指定目标发送
-		targets := strings.Split(targetParam, ",")
-		for _, t := range targets {
-			t = strings.TrimSpace(strings.ToLower(t))
-
-			// 检查 target 是否存在
-			webhookURL, exists := common.FeishuWebhook[t]
-			if !exists {
-				log.Printf("⚠️ Target '%s' not found in configuration", t)
-				continue
-			}
-
-			if err := msg.SendToFeishu(webhookURL, t); err != nil {
-				log.Printf("❌ Failed to send to %s: %v", t, err)
-			}
+		// 如果有 GeneratorURL，则显示
+		if alert.GeneratorURL != "" {
+			builder.WriteString(fmt.Sprintf("生成器: %s\n", alert.GeneratorURL))
 		}
-	} else {
-		// 默认广播全部
-		for name, webhookURL := range common.FeishuWebhook {
+
+		text := builder.String()
+		msg := NewMessage(text)
+
+		// 发送到所有目标
+		for name, webhookURL := range targetWebhooks {
 			if err := msg.SendToFeishu(webhookURL, name); err != nil {
-				log.Printf("❌ Failed to send to %s: %v", name, err)
+				log.Printf("❌ Failed to send alert %s to %s: %v", alertName, name, err)
+			} else {
+				log.Printf("✅ Sent alert %s to feishu %s", alertName, name)
 			}
 		}
 	}
