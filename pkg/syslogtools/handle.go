@@ -119,12 +119,12 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		builder.WriteString(fmt.Sprintf("Alert: %s\nStatus: %s\nSummary: %s\nDescription: %s\n",
+		builder.WriteString(fmt.Sprintf("Alert: %s | Status: %s | Summary: %s | Description: %s",
 			alertName, status, summary, desc))
 
 		// 如果有触发日志信息，则添加显示
 		if triggerLogs != "" {
-			builder.WriteString(fmt.Sprintf("Trigger Logs:\n%s\n", triggerLogs))
+			builder.WriteString(fmt.Sprintf(" | Trigger Logs: %s", triggerLogs))
 		}
 
 		text := builder.String()
