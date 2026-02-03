@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -116,24 +117,41 @@ func (c *Client) QueryLogs(query string, limit int, rangeMinutes int) ([]string,
 }
 
 // FormatLogs 格式化日志列表为易读的文本。
+// 会清理掉八进制转义序列（#011=tab, #012=newline）使输出更清晰。
 func FormatLogs(logs []string, maxLines int) string {
 	if len(logs) == 0 {
 		return "（无日志内容）"
 	}
 
-	var result string
-	count := len(logs)
-	if count > maxLines {
-		count = maxLines
-	}
+	var builder strings.Builder
+	count := min(len(logs), maxLines)
 
-	for i := 0; i < count; i++ {
-		result += fmt.Sprintf("%d. %s\n", i+1, logs[i])
+	for i := range count {
+		// 清理日志中的八进制转义序列
+		cleanLog := cleanLogLine(logs[i])
+		fmt.Fprintf(&builder, "%d. %s | ", i+1, cleanLog)
 	}
 
 	if len(logs) > maxLines {
-		result += fmt.Sprintf("...（还有 %d 条日志未显示）\n", len(logs)-maxLines)
+		fmt.Fprintf(&builder, "...（还有 %d 条日志未显示）", len(logs)-maxLines)
 	}
 
-	return result
+	return builder.String()
+}
+
+// cleanLogLine 清理日志行中的转义序列和多余的空白字符。
+func cleanLogLine(log string) string {
+	// 替换常见的八进制转义序列
+	log = strings.ReplaceAll(log, "#011", " ")  // Tab -> 空格
+	log = strings.ReplaceAll(log, "#012", " ")  // 换行 -> 空格
+	log = strings.ReplaceAll(log, "\t", " ")    // 实际 Tab -> 空格
+	log = strings.ReplaceAll(log, "\n", " ")    // 实际换行 -> 空格
+	log = strings.ReplaceAll(log, "\r", " ")    // 回车 -> 空格
+
+	// 压缩多个连续空格为一个
+	for strings.Contains(log, "  ") {
+		log = strings.ReplaceAll(log, "  ", " ")
+	}
+
+	return strings.TrimSpace(log)
 }
